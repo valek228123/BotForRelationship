@@ -6,9 +6,8 @@ from keyboards import (main_menu, wishlist_menu,
 from database import (save_wishlist, get_partner_id, get_wishlist, save_pair,
                       delete_wishlist_item, save_surprise,save_date_idea,get_all_unused_date_ideas,
                       mark_date_idea_used,get_last_date_sender,save_date_history,get_current_month_date_info,
-                       get_all_paired_users,mark_date_reminded,get_dates_for_reminder,save_important_date,
+                       mark_date_reminded,get_dates_for_reminder,save_important_date,
                       get_all_paired_users, get_all_important_dates, delete_important_date)
-import aiosqlite
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import asyncio
 import random
