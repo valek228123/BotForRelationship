@@ -1,5 +1,6 @@
 import asyncio
 import os
+import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import CallbackQuery
@@ -20,59 +21,20 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 
-
-
-async def keep_alive():
-    """
-    Просто периодически выводим сообщение в логи.
-    Это показывает Render что процесс активен.
-    """
-    while True:
-        print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] Бот активен и работает!")
-        # Ждём 10 минут до следующего сообщения
-        await asyncio.sleep(600)
-
-
-
-
-async def start_simple_server():
-    """
-    Минимальный веб-сервер только чтобы Render видел открытый порт.
-    Он просто отвечает 'OK' на любые запросы.
-    """
-
-    app = web.Application()
-
-
-    async def handle_request(request):
-        return web.Response(text="🤖 Бот работает! 💕")
-
-    app.router.add_get('/', handle_request)
-    app.router.add_get('/health', handle_request)
-
-
-    runner = web.AppRunner(app)
-    await runner.setup()
-
-    port = int(os.environ.get("PORT", 10000))
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
-
-    print(f"🌐 Сервер запущен на порту {port}")
-    print("📡 Render теперь видит открытый порт и доволен!")
-
-    return runner
-
-
-
-
+# ВСЕ ТВОИ ОБРАБОТЧИКИ (оставь как были)
 @dp.message(Command("start"))
-async def start(message : types.Message):
+async def start(message: types.Message):
     await start_handler(message)
+
 
 @dp.message(Command("myid"))
 async def myid(message: types.Message):
     await my_id_handler(message)
+
+
+@dp.message(Command("pair"))
+async def pair(message: types.Message):
+    await pair_handler(message)
 
 
 @dp.callback_query(lambda c: c.data == "wishlist")
@@ -91,13 +53,8 @@ async def view_partner(callback: CallbackQuery):
 
 
 @dp.callback_query(lambda c: c.data == "view_my_wishlist")
-async def view_partner(callback: CallbackQuery):
+async def view_my_wishlist(callback: CallbackQuery):
     await view_my_handler(callback)
-
-
-@dp.message(Command("pair"))
-async def pair(message: types.Message):
-    await pair_handler(message)
 
 
 @dp.callback_query(lambda c: c.data == "delete_wishlist")
@@ -110,14 +67,9 @@ async def confirm_delete_handler(callback: CallbackQuery):
     await confirm_delete(callback)
 
 
-@dp.callback_query(lambda c: c.data.startswith("back_to_menu"))
+@dp.callback_query(lambda c: c.data == "back_to_menu")
 async def back_to_menu(callback: CallbackQuery):
     await back_to_menu_handler(callback)
-
-
-@dp.message()
-async def handle_message(message: types.Message):
-    await message_handler(message)
 
 
 @dp.callback_query(lambda c: c.data == "unexpected_surprise")
@@ -160,36 +112,67 @@ async def confirm_delete_date_handler(callback: CallbackQuery):
     await confirm_delete_important_date(callback)
 
 
-# ==============================================
-# ОСНОВНАЯ ФУНКЦИЯ ЗАПУСКА
-# ==============================================
+@dp.message()
+async def handle_message(message: types.Message):
+    await message_handler(message)
+
+
+async def keep_app_awake():
+    """Периодически 'будит' приложение запросами"""
+    # Render сам дает переменную RENDER_EXTERNAL_URL
+    app_url = os.getenv("RENDER_EXTERNAL_URL", "https://your-app-name.onrender.com")
+
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{app_url}/health") as resp:
+                    print(f"🔔 [{datetime.now()}] Приложение разбужено. Статус: {resp.status}")
+        except Exception as e:
+            print(f"❌ Ошибка пробуждения: {e}")
+
+        # Будим каждые 8 минут
+        await asyncio.sleep(480)
+
 
 async def main():
-    server_runner = await start_simple_server()
+    # УДАЛИ ВЕБХУК ПЕРЕД ЗАПУСКОМ POLLING
+    await bot.delete_webhook()
+    print("✅ Webhook удален, переходим в режим polling")
 
-    # Инициализируем базу данных
+    # Инициализируем БД
     await init_db()
-    print("🗄️ База данных инициализирована.")
-
-    # Запускаем "будильник" чтобы бот не засыпал
-    asyncio.create_task(keep_alive())
-    print("🔔 Будильник запущен - бот не уснёт!")
+    print("🗄️ База данных инициализирована")
 
     # Запускаем планировщики
-    print("📅 Планировщик ежемесячного свидания запущен.")
     asyncio.create_task(schedule_monthly_date_check(bot))
-
-    print("⏰ Планировщик ежедневных напоминаний запущен.")
     asyncio.create_task(daily_reminder_check(bot))
+    print("📅 Планировщики запущены")
 
-    print("🤖 Бот запускается...")
+    # Запускаем авто-пробуждение
+    asyncio.create_task(keep_app_awake())
+    print("🔔 Авто-пробуждение запущено")
 
-    try:
-        await dp.start_polling(bot)
-    except Exception as e:
-        print(f"❌ Ошибка при работе бота: {e}")
-    finally:
-        await server_runner.cleanup()
+    # Health endpoint для UptimeRobot
+    app = web.Application()
+
+    async def health_check(request):
+        return web.Response(text="🤖 Бот работает! 💕")
+
+    app.router.add_get('/', health_check)
+    app.router.add_get('/health', health_check)
+
+    # Запускаем сервер
+    port = int(os.environ.get("PORT", 10000))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+
+    print(f"🌐 Health сервер запущен на порту {port}")
+    print("🤖 Бот запускается в режиме polling...")
+
+    # Запускаем polling
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
