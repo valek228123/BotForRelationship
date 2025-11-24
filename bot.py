@@ -1,4 +1,6 @@
 import asyncio
+import os
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import CallbackQuery
 from aiogram.filters import Command
@@ -19,28 +21,57 @@ dp = Dispatcher()
 
 
 # ==============================================
-# ФУНКЦИЯ "БУДИЛЬНИКА" - НЕ ДАЁТ БОТУ УСНУТЬ
+# ФУНКЦИЯ "БУДИЛЬНИКА" - ЧТОБЫ БОТ НЕ ЗАСЫПАЛ
 # ==============================================
 
-async def keep_bot_awake():
+async def keep_alive():
     """
-    Эта функция каждые 10 минут проверяет, что бот живой.
-    Она просто делает маленький запрос к Telegram API.
-    Это не даст Render усыпить нашего бота!
+    Просто периодически выводим сообщение в логи.
+    Это показывает Render что процесс активен.
     """
     while True:
-        try:
-            user = await bot.get_me()
-            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] Будильник сработал! Бот жив, имя: {user.first_name}")
-        except Exception as e:
-            print(f"⚠️ Ошибка в будильнике: {e}")
-
-        # Ждём 10 минут (600 секунд) до следующей проверки
+        print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] Бот активен и работает!")
+        # Ждём 10 минут до следующего сообщения
         await asyncio.sleep(600)
 
 
 # ==============================================
-# ВАШИ СУЩЕСТВУЮЩИЕ ХЭНДЛЕРЫ (НИЧЕГО НЕ МЕНЯЕМ)
+# ПРОСТОЙ ВЕБ-СЕРВЕР ДЛЯ RENDER
+# ==============================================
+
+async def start_simple_server():
+    """
+    Минимальный веб-сервер только чтобы Render видел открытый порт.
+    Он просто отвечает 'OK' на любые запросы.
+    """
+    # Создаем простое веб-приложение
+    app = web.Application()
+
+    # Функция которая отвечает на запросы
+    async def handle_request(request):
+        return web.Response(text="🤖 Бот работает! 💕")
+
+    # Настраиваем маршруты
+    app.router.add_get('/', handle_request)
+    app.router.add_get('/health', handle_request)
+
+    # Запускаем сервер
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    # Получаем порт из переменных Render (или используем 10000)
+    port = int(os.environ.get("PORT", 10000))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+
+    print(f"🌐 Сервер запущен на порту {port}")
+    print("📡 Render теперь видит открытый порт и доволен!")
+
+    return runner
+
+
+# ==============================================
+# ВАШИ СУЩЕСТВУЮЩИЕ ХЭНДЛЕРЫ (БЕЗ ИЗМЕНЕНИЙ)
 # ==============================================
 
 @dp.message(Command("start"))
@@ -143,22 +174,34 @@ async def confirm_delete_date_handler(callback: CallbackQuery):
 # ==============================================
 
 async def main():
+    # Запускаем простой веб-сервер для Render
+    server_runner = await start_simple_server()
+
+    # Инициализируем базу данных
     await init_db()
-    print("База данных инициализирована.")
+    print("🗄️ База данных инициализирована.")
 
-    # ==============================================
-    # ЗАПУСКАЕМ БУДИЛЬНИК - ВАЖНАЯ СТРОЧКА!
-    # ==============================================
-    asyncio.create_task(keep_bot_awake())
-    print("🔄 Будильник запущен - бот не уснёт!")
+    # Запускаем "будильник" чтобы бот не засыпал
+    asyncio.create_task(keep_alive())
+    print("🔔 Будильник запущен - бот не уснёт!")
 
-    print("Планировщик ежемесячного свидания запущен.")
+    # Запускаем планировщики
+    print("📅 Планировщик ежемесячного свидания запущен.")
     asyncio.create_task(schedule_monthly_date_check(bot))
-    print("Планировщик ежедневных напоминаний запущен.")
+
+    print("⏰ Планировщик ежедневных напоминаний запущен.")
     asyncio.create_task(daily_reminder_check(bot))
 
     print("🤖 Бот запускается...")
-    await dp.start_polling(bot)
+
+    try:
+        # Запускаем бота (ваш существующий код)
+        await dp.start_polling(bot)
+    except Exception as e:
+        print(f"❌ Ошибка при работе бота: {e}")
+    finally:
+        # Корректно закрываем сервер при остановке
+        await server_runner.cleanup()
 
 
 if __name__ == "__main__":
