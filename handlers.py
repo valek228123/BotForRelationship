@@ -24,14 +24,14 @@ STATE_AWAITING_IMPORTANT_TITLE = "awaiting_important_title"
 STATE_AWAITING_IMPORTANT_DATE = "awaiting_important_date"
 STATE_AWAITING_IMPORTANT_REMINDER = "awaiting_important_reminder"
 
-# /start
+
 async def start_handler(message: types.Message):
    await message.answer("Привет! Я романтичный бот 💌", reply_markup=main_menu)
    await message.answer("Различные команды есть прямо под строкой ввода 😀\n"
                         "Команда /pair нужна для того что бы связать себя со своим партнером,после этой окманды напиши id партнера \n"
-                        "Команда /id покажет твой id",reply_markup=keyboard)
+                        "Команда /myid покажет твой id",reply_markup=keyboard)
 
-#unexpected_surprise
+
 async def unexpected_surprise_handler(callback: types.CallbackQuery):
     partner_id = await get_partner_id(callback.from_user.id)
     if not partner_id:
@@ -45,16 +45,11 @@ async def unexpected_surprise_handler(callback: types.CallbackQuery):
     )
 
 
-# Функция для задержки и отправки сюрприза
+
 async def send_surprise_later(bot_instance,requester_id, partner_id, text, delay_seconds):
     await asyncio.sleep(delay_seconds)
     try:
-        # Извлекаем объект User из ChatMember
         user_object = (await bot_instance.get_chat_member(requester_id, requester_id)).user
-
-        # --- ИСПРАВЛЕНИЕ: МАНУАЛЬНОЕ СОЗДАНИЕ ССЫЛКИ-УПОМИНАНИЯ ---
-        # Используем формат Markdown: [Имя](tg://user?id=ID)
-        # Это универсальный способ, который работает, даже если нет username.
         requester_mention = f"[{user_object.first_name}](tg://user?id={user_object.id})"
 
         await bot_instance.send_message(
@@ -67,7 +62,7 @@ async def send_surprise_later(bot_instance,requester_id, partner_id, text, delay
     except Exception as e:
         print(f"Ошибка при отправке сюрприза: {e}")
 
-# WishList меню
+
 async def wishlist_handler(callback: types.CallbackQuery):
     await callback.message.answer("Выбери действие:", reply_markup=wishlist_menu)
 
@@ -79,8 +74,6 @@ async def add_wishlist_handler(callback: types.CallbackQuery):
 
 async def this_months_date_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-
-    # Получаем информацию о назначенном свидании на этот месяц
     date_info = await get_current_month_date_info()
 
     if not date_info:
@@ -94,12 +87,11 @@ async def this_months_date_handler(callback: types.CallbackQuery):
 
     sender_id, title, description, deadline_date = date_info
 
-    # Форматируем дату срока
+
     deadline = date.fromisoformat(deadline_date)
     deadline_str = deadline.strftime("%d.%m.%Y")
 
     if user_id == sender_id:
-        # Если пользователь - тот, кто должен организовать свидание
         await callback.message.answer(
             f"📅 **Свидание месяца: {title}** 📅\n\n"
             f"**Задача:** Организовать это свидание до **{deadline_str}**.\n\n"
@@ -109,7 +101,6 @@ async def this_months_date_handler(callback: types.CallbackQuery):
             reply_markup=date_menu
         )
     else:
-        # Если пользователь - тот, кто ждет свидания
         await callback.message.answer(
             "💖 **Жди прекрасного времяпровождения** 💖\n\n"
             "Твой партнер уже что-то готовит для тебя... "
@@ -122,14 +113,13 @@ last_run_check = {}
 
 
 async def schedule_monthly_date_check(bot_instance):
-    last_execution_month = None  # Запоминаем последний месяц выполнения
+    last_execution_month = None
 
     while True:
         now = datetime.now()
-        current_month = (now.year, now.month)  # Текущий год и месяц
+        current_month = (now.year, now.month)
 
         if now.day == 15 and now.hour == 10 and now.minute == 0:
-            # Проверяем, не выполняли ли уже в этом месяце
             if last_execution_month != current_month:
                 print(f"✅ {now.strftime('%d.%m.%Y %H:%M')} - Назначаем свидание месяца!")
                 await assign_monthly_date(bot_instance)
@@ -144,59 +134,49 @@ async def assign_monthly_date(bot_instance):
     Организатор чередуется между партнерами.
     """
 
-    # 1. Проверяем, назначено ли свидание уже на этот месяц
+
     if await get_current_month_date_info():
-        # Если назначено, прекращаем выполнение, чтобы избежать дублирования после перезапуска бота
         return
 
-    # 2. Определяем, кто должен стать организатором
     last_sender_id = await get_last_date_sender()
     all_paired_users = await get_all_paired_users()
 
     if not all_paired_users:
-        # Если в базе данных нет ни одного пользователя с партнером, нет смысла продолжать
         print("Ошибка назначения свидания: В базе данных нет связанных пар.")
-        # Можно добавить отправку сообщения администратору
         return
 
     current_sender_id = None
     partner_id = None
 
     if not last_sender_id:
-        # Если это первый запуск или история пуста: выбираем первого пользователя, у которого есть партнер
         current_sender_id = all_paired_users[0]
         partner_id = await get_partner_id(current_sender_id)
 
     else:
-        # Если свидание уже назначалось:
-        # Партнер предыдущего отправителя (last_sender_id) должен стать текущим отправителем.
         current_sender_id = await get_partner_id(last_sender_id)
-        partner_id = last_sender_id  # Предыдущий отправитель становится партнером, который ждет
+        partner_id = last_sender_id
 
-        # Защита: Если партнер не найден (например, был удален), берем первого из всех пар
         if not current_sender_id:
             current_sender_id = all_paired_users[0]
             partner_id = await get_partner_id(current_sender_id)
 
-    # Двойная проверка на наличие партнера у назначенного отправителя (на всякий случай)
+
     if not current_sender_id or not partner_id:
         print(
             f"Ошибка назначения свидания: Не удалось найти полную пару для чередования (current_sender_id: {current_sender_id}, partner_id: {partner_id}).")
         return
 
-    # 3. Выбираем случайную идею
     ideas = await get_all_unused_date_ideas()
     if not ideas:
         await bot_instance.send_message(current_sender_id, "Нет доступных идей для свиданий! Пожалуйста, добавьте их.")
         return
 
-    # Выбираем случайную идею из наименее использованных (для разнообразия берем из первых 5)
     random_idea = random.choice(ideas[:5])
     idea_id, title, description = random_idea
 
-    # 4. Устанавливаем срок и сохраняем историю
+
     month_start_date = date.today().replace(day=15)
-    deadline_date = month_start_date + timedelta(days=30)  # Срок - 30 дней от 15 числа
+    deadline_date = month_start_date + timedelta(days=30)
 
     await save_date_history(
         current_sender_id,
@@ -206,30 +186,29 @@ async def assign_monthly_date(bot_instance):
     )
     await mark_date_idea_used(idea_id)
 
-    # 5. Отправляем сообщение организатору
+
     await bot_instance.send_message(
         current_sender_id,
-        f"🎉 **Свидание месяца назначено!** 🎉\n\n"
-        f"**Задача месяца (для тебя):** Организовать свидание:\n"
-        f"**Название:** {title}\n"
-        f"**Описание:** {description}\n\n"
-        f"**Срок выполнения:** До {deadline_date.strftime('%d.%m.%Y')}. Нажми кнопку 'This Month's Date 📅' для напоминания!",
+        f"🎉 Свидание месяца назначено! 🎉\n\n"
+        f"Задача месяца (для тебя): Организовать свидание:\n"
+        f"Название: {title}\n"
+        f"Описание: {description}\n\n"
+        f"Срок выполнения: До {deadline_date.strftime('%d.%m.%Y')}. Нажми кнопку 'This Month's Date 📅' для напоминания!",
         parse_mode="Markdown"
     )
 
-    # 6. Отправляем уведомление партнеру
+
     await bot_instance.send_message(
         partner_id,
         "🤫 **Секрет!** Твой партнер только что получил задание на Свидание Месяца. Жди сюрприза!",
         parse_mode="Markdown"
     )
 async def add_date_idea_handler(callback: types.CallbackQuery):
-    # Эта функция для административной загрузки
     user_states[callback.from_user.id] = STATE_AWAITING_DATE_TITLE
     await callback.message.answer("Введите **название** идеи свидания (например: 'Романтический ужин на крыше').", parse_mode="Markdown")
 
 
-# Ловим текст или фото
+
 async def message_handler(message: types.Message):
     state = user_states.get(message.from_user.id)
     user_id = message.from_user.id
@@ -243,7 +222,6 @@ async def message_handler(message: types.Message):
         user_states.pop(message.from_user.id, None)
         await message.answer("Выбери действие:", reply_markup=wishlist_menu)
     elif state == STATE_AWAITING_SURPRISE_TEXT:
-        # Сохраняем текст сюрприза временно в состояние
         surprise_text = message.text
         user_states[user_id] = {
             "state": STATE_AWAITING_SURPRISE_DELAY,
@@ -269,7 +247,6 @@ async def message_handler(message: types.Message):
             user_states.pop(user_id, None)
             return
 
-        # Регулярное выражение для парсинга диапазона: "от X до Y (дней/часов/месяцев)"
         match = re.search(
             r'от\s*(\d+)\s*до\s*(\d+)\s*(дней|дня|день|часов|часа|час|месяцев|месяца|месяц)',
             message.text,
@@ -305,10 +282,8 @@ async def message_handler(message: types.Message):
             await message.answer("Минимальный срок должен быть меньше максимального.")
             return
 
-        # Рандомная задержка (от минимального до максимального срока)
         delay_seconds = random.randint(min_delay_seconds, max_delay_seconds)
 
-        # Сохранение и отправка
         await save_surprise(user_id, partner_id, surprise_text, delay_seconds)
         asyncio.create_task(send_surprise_later(message.bot,user_id, partner_id, surprise_text, delay_seconds))
 
@@ -341,7 +316,6 @@ async def message_handler(message: types.Message):
         await message.answer("Теперь введите **подробное описание** свидания (один абзац).", parse_mode="Markdown")
         return
 
-        # --- БЛОК 4: Ожидание описания идеи ---
     elif state and isinstance(state, dict) and state.get("state") == STATE_AWAITING_DATE_DESCRIPTION:
         title = state["title"]
         description = message.text
@@ -350,7 +324,7 @@ async def message_handler(message: types.Message):
 
         user_states.pop(user_id, None)
         await message.answer(
-            f"Идея свидания **'{title}'** успешно добавлена!",
+            f"Идея свидания '{title}' успешно добавлена!",
             parse_mode="Markdown",
         )
         await message.answer("Выбери действие:", reply_markup=date_menu)
@@ -361,16 +335,14 @@ async def message_handler(message: types.Message):
             "title": message.text
         }
         await message.answer(
-            "Отлично! Теперь введите саму **дату** события (в формате ГГГГ-ММ-ДД, например: 2026-06-25):",
+            "Отлично! Теперь введите саму дату события (в формате ГГГГ-ММ-ДД, например: 2026-06-25):",
             parse_mode="Markdown")
         return
 
     elif state and isinstance(state, dict) and state.get("state") == STATE_AWAITING_IMPORTANT_DATE:
         try:
-            # Проверка формата даты
             event_date = datetime.strptime(message.text, '%Y-%m-%d').date()
 
-            # Сохраняем дату и переходим к напоминанию
             user_states[user_id].update({
                 "state": STATE_AWAITING_IMPORTANT_REMINDER,
                 "event_date": event_date.strftime('%Y-%m-%d')
@@ -388,7 +360,7 @@ async def message_handler(message: types.Message):
 
             title = user_states[user_id]["title"]
             event_date_str = user_states[user_id]["event_date"]
-            partner_id = await get_partner_id(user_id)  # Нужно получить партнера
+            partner_id = await get_partner_id(user_id)
 
             await save_important_date(user_id, partner_id, title, event_date_str, reminder_days)
 
@@ -412,7 +384,6 @@ async def back_to_menu_handler(callback: types.CallbackQuery):
 
 
 
-# Просмотр WL партнёра
 async def view_partner_handler(callback: types.CallbackQuery):
     partner_id = await get_partner_id(callback.from_user.id)
     if not partner_id:
@@ -440,7 +411,6 @@ async def view_my_handler(callback: types.CallbackQuery):
             else:
                 await callback.message.answer(f"💭 {text}")
     await callback.message.answer("Выбери действие:", reply_markup=wishlist_menu)
-# Связка пары
 async def pair_handler(message: types.Message):
     try:
         partner_id = int(message.text.split()[1])
@@ -450,7 +420,6 @@ async def pair_handler(message: types.Message):
         await message.answer("Используй формат: /pair ID")
     await message.answer("Выбери действие:", reply_markup=wishlist_menu)
 
-# Удаление желания
 async def delete_wishlist_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     wishes = await get_wishlist(user_id)
@@ -494,19 +463,12 @@ async def add_important_date_handler(callback: types.CallbackQuery):
     user_states[user_id] = STATE_AWAITING_IMPORTANT_TITLE
     await callback.message.answer("Введите **название** важной даты (например: 'Годовщина встречи'):", parse_mode='Markdown')
 
-# 2. Ловим название (продолжение в message_handler)
 
 # 3. Ежедневный планировщик напоминаний
 async def daily_reminder_check(bot_instance):
     """Ежедневно проверяет, нужно ли отправлять напоминания о важных датах."""
     while True:
-        # Проверяем напоминания каждый день в 10:00 утра
         now = datetime.now()
-
-        # ВРЕМЕННОЕ УСЛОВИЕ ДЛЯ ТЕСТА (каждые 5 минут):
-        # if now.minute % 5 == 0 and now.second < 10:
-
-        # БОЕВОЕ УСЛОВИЕ
         if now.hour == 10 and now.minute == 0:
 
             print("--- Запуск ежедневной проверки напоминаний ---")
@@ -518,11 +480,9 @@ async def daily_reminder_check(bot_instance):
 
                 event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
 
-                # Дата, когда должно сработать напоминание
                 reminder_date = event_date - timedelta(days=reminder_days)
 
                 if today >= reminder_date:
-                    # Отправляем напоминание
                     days_left = (event_date - today).days
 
                     text = (
@@ -545,7 +505,6 @@ async def daily_reminder_check(bot_instance):
 
 
 async def view_all_important_dates_handler(callback: types.CallbackQuery):
-    """Показывает все важные даты, созданные пользователем ИЛИ партнером."""
     user_id = callback.from_user.id
     partner_id = await get_partner_id(user_id)
 
@@ -553,7 +512,6 @@ async def view_all_important_dates_handler(callback: types.CallbackQuery):
         await callback.message.answer("Ты еще не в паре! Используй команду /pair ID")
         return
 
-    # Получаем даты обоих партнеров
     dates = await get_all_important_dates(user_id, partner_id)
 
     if not dates:
@@ -592,10 +550,10 @@ async def delete_important_date_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     partner_id = await get_partner_id(user_id)
 
-    # Получаем только даты, созданные ТЕКУЩИМ пользователем (удалять может только инициатор)
-    dates = await get_all_important_dates(user_id, partner_id)  # Используем общую функцию, но отбираем только свои ниже
 
-    my_dates = [d for d in dates if d[0] is not None]  # d[0] это id, которое не None
+    dates = await get_all_important_dates(user_id, partner_id)
+
+    my_dates = [d for d in dates if d[0] is not None]
 
     if not my_dates:
         await callback.message.answer("Ты не создавал никаких важных дат для удаления 💤",
@@ -606,7 +564,7 @@ async def delete_important_date_handler(callback: types.CallbackQuery):
     for date_id, title, _, _ in my_dates:
         buttons.append([InlineKeyboardButton(
             text=f"❌ {title}",
-            callback_data=f"del_date_{date_id}"  # Используем уникальный префикс
+            callback_data=f"del_date_{date_id}"
         )])
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)

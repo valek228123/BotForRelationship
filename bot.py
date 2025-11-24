@@ -20,9 +20,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 
-# ==============================================
-# ФУНКЦИЯ "БУДИЛЬНИКА" - ЧТОБЫ БОТ НЕ ЗАСЫПАЛ
-# ==============================================
+
 
 async def keep_alive():
     """
@@ -35,31 +33,27 @@ async def keep_alive():
         await asyncio.sleep(600)
 
 
-# ==============================================
-# ПРОСТОЙ ВЕБ-СЕРВЕР ДЛЯ RENDER
-# ==============================================
+
 
 async def start_simple_server():
     """
     Минимальный веб-сервер только чтобы Render видел открытый порт.
     Он просто отвечает 'OK' на любые запросы.
     """
-    # Создаем простое веб-приложение
+
     app = web.Application()
 
-    # Функция которая отвечает на запросы
+
     async def handle_request(request):
         return web.Response(text="🤖 Бот работает! 💕")
 
-    # Настраиваем маршруты
     app.router.add_get('/', handle_request)
     app.router.add_get('/health', handle_request)
 
-    # Запускаем сервер
+
     runner = web.AppRunner(app)
     await runner.setup()
 
-    # Получаем порт из переменных Render (или используем 10000)
     port = int(os.environ.get("PORT", 10000))
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
@@ -70,14 +64,11 @@ async def start_simple_server():
     return runner
 
 
-# ==============================================
-# ВАШИ СУЩЕСТВУЮЩИЕ ХЭНДЛЕРЫ (БЕЗ ИЗМЕНЕНИЙ)
-# ==============================================
+
 
 @dp.message(Command("start"))
-async def start(message: types.Message):
+async def start(message : types.Message):
     await start_handler(message)
-
 
 @dp.message(Command("myid"))
 async def myid(message: types.Message):
@@ -174,7 +165,6 @@ async def confirm_delete_date_handler(callback: CallbackQuery):
 # ==============================================
 
 async def main():
-    # Запускаем простой веб-сервер для Render
     server_runner = await start_simple_server()
 
     # Инициализируем базу данных
@@ -195,12 +185,10 @@ async def main():
     print("🤖 Бот запускается...")
 
     try:
-        # Запускаем бота (ваш существующий код)
         await dp.start_polling(bot)
     except Exception as e:
         print(f"❌ Ошибка при работе бота: {e}")
     finally:
-        # Корректно закрываем сервер при остановке
         await server_runner.cleanup()
 
 
