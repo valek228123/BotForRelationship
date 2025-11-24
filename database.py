@@ -193,6 +193,12 @@ async def get_all_paired_users():
 
 
 async def save_date_history(user_id, date_idea_id, month_start_date, deadline_date):
+    # ИСПРАВЛЕНИЕ: преобразуем строки в date если нужно
+    if isinstance(month_start_date, str):
+        month_start_date = datetime.strptime(month_start_date, '%Y-%m-%d').date()
+    if isinstance(deadline_date, str):
+        deadline_date = datetime.strptime(deadline_date, '%Y-%m-%d').date()
+
     async with pool.acquire() as conn:
         await conn.execute(
             "INSERT INTO date_history (user_id, date_idea_id, month_start_date, deadline_date) VALUES ($1, $2, $3, $4)",
@@ -203,8 +209,12 @@ async def save_date_history(user_id, date_idea_id, month_start_date, deadline_da
 async def get_current_month_date_info():
     # Получаем информацию о текущем свидании месяца (если оно уже было назначено)
     from datetime import date
-    # Используем to_char для сравнения только по месяцу и году, если 'day=15' — это ваша логика начала месяца
-    current_month_start = date.today().replace(day=15).strftime('%Y-%m-%d')
+
+    # ИСПРАВЛЕНИЕ: создаем объект date, а не строку
+    current_month_start = date.today().replace(day=15)
+
+    # Дополнительная проверка для отладки
+    print(f"🔍 Ищем свидание для месяца: {current_month_start} (тип: {type(current_month_start)})")
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
@@ -214,10 +224,16 @@ async def get_current_month_date_info():
             JOIN date_ideas di ON dh.date_idea_id = di.id
             WHERE dh.month_start_date = $1
             ORDER BY dh.id DESC LIMIT 1
-        """, current_month_start)
+        """, current_month_start)  # Теперь передаем объект date, а не строку
+
         # Возвращаем кортеж (user_id, title, description, deadline_date)
-        return (
-        row['user_id'], row['title'], row['description'], row['deadline_date'].strftime('%Y-%m-%d')) if row else None
+        if row:
+            result = (row['user_id'], row['title'], row['description'], row['deadline_date'].strftime('%Y-%m-%d'))
+            print(f"✅ Найдено свидание: {result}")
+            return result
+        else:
+            print("ℹ️ Свидание на этот месяц не найдено")
+            return None
 
 
 # --- Функции для Important Dates (Важных Дат) ---

@@ -8,7 +8,7 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
 ])
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="/Назад в меню ⬅️"), KeyboardButton(text="/myid")],
+        [KeyboardButton(text="/Назад в меню ⬅️"), KeyboardButton(text="/myid"), KeyboardButton(text="/pair")],
 
     ],
     resize_keyboard=True,  # Подгоняет размер кнопок

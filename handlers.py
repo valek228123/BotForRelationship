@@ -27,7 +27,9 @@ STATE_AWAITING_IMPORTANT_REMINDER = "awaiting_important_reminder"
 # /start
 async def start_handler(message: types.Message):
    await message.answer("Привет! Я романтичный бот 💌", reply_markup=main_menu)
-   await message.answer("Различные команды есть пряма под сракой ввода 😀",reply_markup=keyboard)
+   await message.answer("Различные команды есть прямо под строкой ввода 😀\n"
+                        "Команда /pair нужна для того что бы связать себя со своим партнером,после этой окманды напиши id партнера \n"
+                        "Команда /id покажет твой id",reply_markup=keyboard)
 
 #unexpected_surprise
 async def unexpected_surprise_handler(callback: types.CallbackQuery):
@@ -326,8 +328,7 @@ async def message_handler(message: types.Message):
             delay_unit_text = "месяцев"
 
         await message.answer(
-            f"Сообщение о сюрпризе принято! Я отправлю его партнёру в случайный момент. "
-            f"Задержка составит около **{delay_all} {delay_unit_text}** 😉",  # <--- Используем две звездочки для жирного
+            f"Сообщение о сюрпризе принято! Я отправлю его партнёру в случайный момент. ",
             parse_mode="Markdown"
         )
         await message.answer("Выбери действие:", reply_markup=main_menu)
