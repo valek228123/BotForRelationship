@@ -119,7 +119,6 @@ async def handle_message(message: types.Message):
 
 async def keep_app_awake():
     """Периодически 'будит' приложение запросами"""
-    # Render сам дает переменную RENDER_EXTERNAL_URL
     app_url = os.getenv("RENDER_EXTERNAL_URL", "https://your-app-name.onrender.com")
 
     while True:
@@ -130,29 +129,23 @@ async def keep_app_awake():
         except Exception as e:
             print(f"❌ Ошибка пробуждения: {e}")
 
-        # Будим каждые 8 минут
         await asyncio.sleep(480)
 
 
 async def main():
-    # УДАЛИ ВЕБХУК ПЕРЕД ЗАПУСКОМ POLLING
     await bot.delete_webhook()
     print("✅ Webhook удален, переходим в режим polling")
 
-    # Инициализируем БД
     await init_db()
     print("🗄️ База данных инициализирована")
 
-    # Запускаем планировщики
     asyncio.create_task(schedule_monthly_date_check(bot))
     asyncio.create_task(daily_reminder_check(bot))
     print("📅 Планировщики запущены")
 
-    # Запускаем авто-пробуждение
     asyncio.create_task(keep_app_awake())
     print("🔔 Авто-пробуждение запущено")
 
-    # Health endpoint для UptimeRobot
     app = web.Application()
 
     async def health_check(request):
@@ -160,8 +153,6 @@ async def main():
 
     app.router.add_get('/', health_check)
     app.router.add_get('/health', health_check)
-
-    # Запускаем сервер
     port = int(os.environ.get("PORT", 10000))
     runner = web.AppRunner(app)
     await runner.setup()
@@ -171,7 +162,7 @@ async def main():
     print(f"🌐 Health сервер запущен на порту {port}")
     print("🤖 Бот запускается в режиме polling...")
 
-    # Запускаем polling
+
     await dp.start_polling(bot)
 
 
