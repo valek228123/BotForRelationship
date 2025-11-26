@@ -1,10 +1,9 @@
-# database.py (ПЕРЕПИСАННЫЙ КОД ДЛЯ POSTGRESQL)
+
 
 import asyncpg
 from config import DATABASE_URL
 from datetime import date, datetime, timedelta
 
-# Глобальная переменная для пула подключений к PostgreSQL
 pool = None
 
 
@@ -256,7 +255,6 @@ async def get_all_important_dates(user_id, partner_id):
             WHERE user_id = $1 OR partner_id = $2
             ORDER BY event_date ASC
         """, user_id, partner_id)
-        # Преобразуем объекты Record в кортежи
         return [(row['id'], row['title'], row['event_date'].strftime('%Y-%m-%d'), row['reminder_days']) for row in rows]
 
 

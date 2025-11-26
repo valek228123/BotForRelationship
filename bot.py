@@ -21,7 +21,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 
-# ВСЕ ТВОИ ОБРАБОТЧИКИ (оставь как были)
+
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await start_handler(message)
@@ -134,8 +134,6 @@ async def keep_app_awake():
 
 async def main():
     await bot.delete_webhook()
-    print("✅ Webhook удален, переходим в режим polling")
-
     await init_db()
     print("🗄️ База данных инициализирована")
 
