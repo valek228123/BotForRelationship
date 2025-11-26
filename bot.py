@@ -119,7 +119,7 @@ async def handle_message(message: types.Message):
 
 async def keep_app_awake():
     """Периодически 'будит' приложение запросами"""
-    app_url = os.getenv("RENDER_EXTERNAL_URL", "https://your-app-name.onrender.com")
+    app_url = os.getenv("RENDER_EXTERNAL_URL")
 
     while True:
         try:

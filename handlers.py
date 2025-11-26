@@ -527,7 +527,6 @@ async def view_all_important_dates_handler(callback: types.CallbackQuery):
         event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
         days_left = (event_date - today).days
 
-        # Определяем, пройдена ли дата
         if days_left < 0:
             status = f"✅ Прошло {-days_left} дн."
         elif days_left == 0:

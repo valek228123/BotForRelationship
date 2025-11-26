@@ -215,14 +215,15 @@ async def get_current_month_date_info():
             return None
 
 
-
-
 async def save_important_date(user_id, partner_id, title, event_date_str, reminder_days):
+    owner_id = min(user_id, partner_id)
+    co_owner_id = max(user_id, partner_id)
+    event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
     async with pool.acquire() as conn:
-        event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
         await conn.execute(
+
             "INSERT INTO important_dates (user_id, partner_id, title, event_date, reminder_days) VALUES ($1, $2, $3, $4, $5)",
-            user_id, partner_id, title, event_date, reminder_days
+            owner_id, co_owner_id, title, event_date, reminder_days
         )
 
 
@@ -247,14 +248,18 @@ async def mark_date_reminded(user_id, title):
         )
 
 
+# database.py
+
 async def get_all_important_dates(user_id, partner_id):
+    owner_id = min(user_id, partner_id)
+    co_owner_id = max(user_id, partner_id)
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT id, title, event_date, reminder_days
             FROM important_dates
-            WHERE user_id = $1 OR partner_id = $2
+            WHERE user_id = $1 AND partner_id = $2 
             ORDER BY event_date ASC
-        """, user_id, partner_id)
+        """, owner_id, co_owner_id)
         return [(row['id'], row['title'], row['event_date'].strftime('%Y-%m-%d'), row['reminder_days']) for row in rows]
 
 
