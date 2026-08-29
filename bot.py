@@ -125,7 +125,7 @@ async def keep_app_awake():
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(f"{app_url}/health") as resp:
-                    print(f"🔔 [{datetime.now()}] Приложение разбужено. Статус: {resp.status}")
+                    print(f"🔔 [{datetime.now()}] Бот разбужен. Статус: {resp.status}")
         except Exception as e:
             print(f"❌ Ошибка пробуждения: {e}")
 
@@ -133,7 +133,6 @@ async def keep_app_awake():
 
 
 async def main():
-    await bot.delete_webhook()
     await init_db()
     print("🗄️ База данных инициализирована")
 
